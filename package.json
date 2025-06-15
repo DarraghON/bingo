@@ -1,0 +1,8 @@
+{
+  "name": "bingo-app",
+  "private": true,
+  "workspaces": [
+    "client",
+    "server"
+  ]
+}
