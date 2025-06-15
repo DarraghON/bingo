@@ -2,7 +2,7 @@ const express = require('express');
 const http = require('http');
 const cors = require('cors');
 const { Server } = require('socket.io');
-const path = require('path');
+const path = require('path'); // Only declare once at the top
 
 const PORT = process.env.PORT || 4000;
 
@@ -209,10 +209,10 @@ io.on('connection', (socket) => {
   socket.on('disconnect', () => {});
 });
 
-// --- Serve frontend build statically (for Render, etc.) ---
-app.use(express.static(path.join(__dirname, '../client/build')));
+// --- Serve frontend build statically (for Vite: use "dist" instead of "build") ---
+app.use(express.static(path.join(__dirname, '../client/dist')));
 app.get('*', (req, res) => {
-  res.sendFile(path.join(__dirname, '../client/build/index.html'));
+  res.sendFile(path.join(__dirname, '../client/dist/index.html'));
 });
 
 server.listen(PORT, () => {
