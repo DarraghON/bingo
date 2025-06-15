@@ -2,11 +2,9 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { io } from 'socket.io-client';
 
-const API_URL = 'http://localhost:4000';
+// No API_URL: always use relative URLs
+const socket = io(); // Defaults to same-origin
 
-const socket = io(API_URL);
-
-// User credentials for login dropdown (short names and passwords)
 const userPasswords = [
   { short: "Ben", username: "user1", password: "martini" },
   { short: "Darragh", username: "user2", password: "spritz" },
@@ -94,7 +92,7 @@ function App() {
 
   const login = async (username, password, short) => {
     try {
-      const res = await axios.post(`${API_URL}/api/login`, { username, password });
+      const res = await axios.post('/api/login', { username, password });
       setAuth({ token: res.data.token, username: res.data.username, short });
     } catch (e) {
       alert('Login failed');
@@ -104,12 +102,12 @@ function App() {
   useEffect(() => {
     if (!auth.token) return;
     (async () => {
-      const resUsers = await axios.get(`${API_URL}/api/users`, {
+      const resUsers = await axios.get('/api/users', {
         headers: { Authorization: auth.token }
       });
       setUsers(resUsers.data);
 
-      const resCards = await axios.get(`${API_URL}/api/cards`, {
+      const resCards = await axios.get('/api/cards', {
         headers: { Authorization: auth.token }
       });
       setCards(resCards.data);
