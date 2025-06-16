@@ -3,12 +3,12 @@ body {
   font-family: 'Inter', Arial, sans-serif;
 }
 
+/* Regular BingoCard styles (unchanged) */
 .bingo-dashboard-container {
   display: flex;
   flex-wrap: wrap;
   justify-content: center;
 }
-
 .bingo-card {
   margin: 24px;
   padding: 16px;
@@ -19,7 +19,6 @@ body {
   background: #fff;
   vertical-align: top;
 }
-
 .bingo-card-header {
   font-weight: bold;
   text-align: center;
@@ -27,13 +26,11 @@ body {
   font-size: 20px;
   letter-spacing: 1px;
 }
-
 .bingo-table {
   border-collapse: separate;
   border-spacing: 6px;
   width: 100%;
 }
-
 .bingo-cell {
   border: 2px solid #bbb;
   border-radius: 8px;
@@ -48,16 +45,13 @@ body {
   position: relative;
   transition: background 0.2s, box-shadow 0.2s;
 }
-
 .bingo-cell:hover {
   background: #e3fbe9;
 }
-
 .bingo-cell.checked {
   background: #56e68c;
   box-shadow: 0 0 0 2px #23c16b;
 }
-
 .bingo-checkmark {
   position: absolute;
   right: 8px;
@@ -65,4 +59,119 @@ body {
   font-weight: bold;
   color: #23c16b;
   font-size: 22px;
+}
+
+/* --- Mike's Accessible Mode --- */
+.mike-access-bg {
+  background: #000 !important;
+  min-height: 100vh;
+  color: #fff !important;
+}
+.mike-access-title {
+  font-size: 3em;
+  text-align: center;
+  margin-top: 1.5em;
+  font-weight: bold;
+  color: #e9e900;
+  letter-spacing: 2px;
+}
+.mike-access-prompt {
+  font-size: 2em;
+  margin: 2em 0 1em 0;
+  text-align: center;
+  color: #fff;
+}
+.mike-access-choices {
+  display: flex;
+  justify-content: center;
+  gap: 2em;
+  margin-bottom: 2em;
+}
+.mike-access-btn {
+  font-size: 2em;
+  background: #e9e900;
+  color: #000;
+  border: none;
+  border-radius: 12px;
+  padding: 0.7em 2em;
+  font-weight: bold;
+  margin: 0 0.5em;
+  cursor: pointer;
+  box-shadow: 0 2px 8px #4448;
+  transition: background 0.15s, color 0.15s;
+}
+.mike-access-btn:hover,
+.mike-access-btn:focus {
+  background: #fff900;
+  color: #000;
+  outline: 3px solid #23c16b;
+}
+.mike-access-back {
+  background: #aaa;
+  color: #222;
+  margin-top: 2em;
+  font-size: 1.2em;
+  padding: 0.4em 1.5em;
+}
+
+/* Mike's Card View */
+.mike-card-container {
+  max-width: 600px;
+  margin: 0 auto;
+  background: #222;
+  border-radius: 20px;
+  padding: 2em 1em 2em 1em;
+  color: #fff;
+  box-shadow: 0 2px 24px #2229;
+}
+.mike-card-title {
+  font-size: 2.2em;
+  text-align: center;
+  margin-bottom: 1.5em;
+  color: #e9e900;
+  letter-spacing: 2px;
+}
+.mike-card-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+.mike-card-row {
+  margin: 0.7em 0;
+}
+.mike-card-btn {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 1.5em;
+  padding: 1.1em 1.2em;
+  border-radius: 10px;
+  background: #111;
+  color: #fff;
+  border: 3px solid #bbb;
+  font-weight: bold;
+  cursor: pointer;
+  letter-spacing: 1px;
+  outline: none;
+  transition: background 0.2s, border 0.2s;
+}
+.mike-card-btn:focus {
+  border: 3px solid #e9e900;
+  background: #222;
+}
+.mike-card-btn.checked {
+  background: #e9e900;
+  color: #000;
+  border: 3px solid #23c16b;
+}
+.mike-card-label {
+  flex: 1 1 auto;
+  text-align: left;
+}
+.mike-card-check {
+  font-size: 2em;
+  margin-left: 1em;
+  color: #23c16b;
+  font-weight: bold;
 }
