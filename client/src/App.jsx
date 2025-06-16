@@ -1,12 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { io } from 'socket.io-client';
-import BingoCard from './BingoCard'; // <-- Import BingoCard
-import './index.css'; // <-- Import CSS
+import BingoCard from './BingoCard';
+import './index.css';
 
 const socket = io();
 
 const userPasswords = [
+  { short: "Admin", username: "admin", password: "adminpass" },
   { short: "Ben", username: "user1", password: "martini" },
   { short: "Darragh", username: "user2", password: "spritz" },
   { short: "Mike", username: "user3", password: "daiquiri" },
@@ -26,6 +27,8 @@ function App() {
   const [auth, setAuth] = useState({ token: null, username: null, short: null });
   const [users, setUsers] = useState([]);
   const [cards, setCards] = useState([]);
+  const [adminSelectedUser, setAdminSelectedUser] = useState('');
+  const [adminCard, setAdminCard] = useState(null);
 
   useEffect(() => {
     if (!auth.token) return;
@@ -66,6 +69,21 @@ function App() {
     })();
   }, [auth]);
 
+  // --- Admin card editing logic ---
+  useEffect(() => {
+    if (auth.username !== "admin" || !adminSelectedUser) {
+      setAdminCard(null);
+      return;
+    }
+    (async () => {
+      const res = await axios.get(`/api/cards/${adminSelectedUser}`, {
+        headers: { Authorization: auth.token }
+      });
+      // Flatten to array of arrays of strings for the form
+      setAdminCard(res.data.card.map(row => row.map(cell => cell.label)));
+    })();
+  }, [auth, adminSelectedUser]);
+
   const handleMark = (username, row, col) => {
     if (!auth.token) return;
     socket.emit('mark_card', { targetUser: username, row, col });
@@ -75,6 +93,59 @@ function App() {
     if (!auth.token) return;
     socket.emit('unmark_card', { targetUser: username, row, col });
   };
+
+  // --- Admin card update submit ---
+  const handleAdminSubmit = async e => {
+    e.preventDefault();
+    await axios.post(`/api/cards/${adminSelectedUser}/labels`, {
+      labelGrid: adminCard
+    }, { headers: { Authorization: auth.token } });
+    alert("Card updated!");
+  };
+
+  // --- Render admin card editor ---
+  if (auth.username === "admin") {
+    return (
+      <div style={{ padding: 20 }}>
+        <h1>Bingo Admin</h1>
+        <div style={{ maxWidth: 400, marginBottom: 20 }}>
+          <label>
+            Select Player:&nbsp;
+            <select value={adminSelectedUser} onChange={e => setAdminSelectedUser(e.target.value)}>
+              <option value="">-- choose player --</option>
+              {users.filter(u => u.username !== "admin").map(u =>
+                <option key={u.username} value={u.username}>{u.short}</option>
+              )}
+            </select>
+          </label>
+        </div>
+        {adminCard && (
+          <form onSubmit={handleAdminSubmit}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 10, maxWidth: 600 }}>
+              {adminCard.map((row, i) =>
+                row.map((label, j) => (
+                  <input
+                    key={i + '-' + j}
+                    type="text"
+                    value={label}
+                    onChange={e => {
+                      const updated = adminCard.map(arr => [...arr]);
+                      updated[i][j] = e.target.value;
+                      setAdminCard(updated);
+                    }}
+                    style={{ padding: 8, borderRadius: 6, border: '1px solid #bbb', fontSize: 15 }}
+                  />
+                ))
+              )}
+            </div>
+            <button type="submit" style={{ marginTop: 22, padding: '10px 24px', fontSize: 16, borderRadius: 6, background: "#56e68c", border: 0 }}>
+              Update Card
+            </button>
+          </form>
+        )}
+      </div>
+    );
+  }
 
   if (!auth.token) {
     return (
