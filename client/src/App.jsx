@@ -1,38 +1,31 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { io } from 'socket.io-client';
-import BingoCard from './BingoCard';
-import MikeCardView from './MikeCardView';
-import './index.css';
+import BingoCard from './BingoCard'; // <-- Import BingoCard
+import './index.css'; // <-- Import CSS
 
 const socket = io();
 
 const userPasswords = [
-  { short: "Ben", username: "user1", password: "martini", gender: "boy" },
-  { short: "Darragh", username: "user2", password: "spritz", gender: "boy" },
-  { short: "Mike", username: "user3", password: "daiquiri", gender: "boy" },
-  { short: "Oscar", username: "user4", password: "mojito", gender: "boy" },
-  { short: "Patrick", username: "user5", password: "negroni", gender: "boy" },
-  { short: "Peter", username: "user6", password: "gimlet", gender: "boy" },
-  { short: "Tilly", username: "user7", password: "margarita", gender: "girl" },
-  { short: "Sally", username: "user8", password: "manhattan", gender: "girl" },
-  { short: "Hannah", username: "user9", password: "julep", gender: "girl" },
-  { short: "Jasmine", username: "user10", password: "cobbler", gender: "girl" },
-  { short: "Erin", username: "user11", password: "flip", gender: "girl" },
-  { short: "Mika", username: "user12", password: "colada", gender: "girl" },
-  { short: "Nell", username: "user13", password: "mai-tai", gender: "girl" },
+  { short: "Ben", username: "user1", password: "martini" },
+  { short: "Darragh", username: "user2", password: "spritz" },
+  { short: "Mike", username: "user3", password: "daiquiri" },
+  { short: "Oscar", username: "user4", password: "mojito" },
+  { short: "Patrick", username: "user5", password: "negroni" },
+  { short: "Peter", username: "user6", password: "gimlet" },
+  { short: "Tilly", username: "user7", password: "margarita" },
+  { short: "Sally", username: "user8", password: "manhattan" },
+  { short: "Hannah", username: "user9", password: "julep" },
+  { short: "Jasmine", username: "user10", password: "cobbler" },
+  { short: "Erin", username: "user11", password: "flip" },
+  { short: "Mika", username: "user12", password: "colada" },
+  { short: "Nell", username: "user13", password: "mai-tai" },
 ];
 
 function App() {
   const [auth, setAuth] = useState({ token: null, username: null, short: null });
   const [users, setUsers] = useState([]);
   const [cards, setCards] = useState([]);
-
-  // Mike accessibility state
-  const [mikeMode, setMikeMode] = useState(false);
-  const [mikeStep, setMikeStep] = useState(0); // 0 = gender select, 1 = user select, 2 = show card
-  const [mikeGender, setMikeGender] = useState(null);
-  const [mikeTarget, setMikeTarget] = useState(null);
 
   useEffect(() => {
     if (!auth.token) return;
@@ -53,14 +46,6 @@ function App() {
     try {
       const res = await axios.post('/api/login', { username, password });
       setAuth({ token: res.data.token, username: res.data.username, short });
-
-      // If Mike, activate accessible mode
-      if (username === "user3") {
-        setMikeMode(true);
-        setMikeStep(0);
-        setMikeGender(null);
-        setMikeTarget(null);
-      }
     } catch (e) {
       alert('Login failed');
     }
@@ -91,62 +76,6 @@ function App() {
     socket.emit('unmark_card', { targetUser: username, row, col });
   };
 
-  // --- Mike's accessible flow ---
-  if (auth.token && mikeMode) {
-    // Step 0: select gender
-    if (mikeStep === 0) {
-      return (
-        <div className="mike-access mike-access-bg">
-          <h1 className="mike-access-title">Welcome, Mike!</h1>
-          <div className="mike-access-prompt">Would you like to view a boy or a girl?</div>
-          <div className="mike-access-choices">
-            <button className="mike-access-btn" onClick={() => { setMikeGender('boy'); setMikeStep(1); }}>Boy</button>
-            <button className="mike-access-btn" onClick={() => { setMikeGender('girl'); setMikeStep(1); }}>Girl</button>
-          </div>
-        </div>
-      );
-    }
-    // Step 1: select user
-    if (mikeStep === 1) {
-      const options = userPasswords.filter(u => u.gender === mikeGender && u.username !== "user3");
-      return (
-        <div className="mike-access mike-access-bg">
-          <h1 className="mike-access-title">Select a {mikeGender}</h1>
-          <div className="mike-access-choices" style={{ flexDirection: 'column', gap: '1.5em' }}>
-            {options.map(u => (
-              <button
-                key={u.username}
-                className="mike-access-btn"
-                onClick={() => { setMikeTarget(u.username); setMikeStep(2); }}
-                style={{ minWidth: 200, fontSize: '2em', margin: '0.5em 0' }}
-              >
-                {u.short}
-              </button>
-            ))}
-          </div>
-          <button className="mike-access-btn mike-access-back" onClick={() => setMikeStep(0)}>Back</button>
-        </div>
-      );
-    }
-    // Step 2: show card for selected user
-    if (mikeStep === 2) {
-      const targetCard = cards.find(c => c.username === mikeTarget);
-      const targetInfo = users.find(u => u.username === mikeTarget);
-      return (
-        <div className="mike-access mike-access-bg">
-          <button className="mike-access-btn mike-access-back" onClick={() => setMikeStep(1)} style={{ marginBottom: 20 }}>Change selection</button>
-          <MikeCardView
-            short={targetInfo ? targetInfo.short : ""}
-            card={targetCard ? targetCard.card : []}
-            onMark={(row, col) => handleMark(mikeTarget, row, col)}
-            onUnmark={(row, col) => handleUnmark(mikeTarget, row, col)}
-          />
-        </div>
-      );
-    }
-  }
-
-  // --- Regular view for all other users ---
   if (!auth.token) {
     return (
       <div style={{ maxWidth: 300, margin: '100px auto', padding: 20, border: '1px solid #ccc' }}>
