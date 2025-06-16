@@ -1,0 +1,68 @@
+body {
+  background: #f3f6fa;
+  font-family: 'Inter', Arial, sans-serif;
+}
+
+.bingo-dashboard-container {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.bingo-card {
+  margin: 24px;
+  padding: 16px;
+  border-radius: 16px;
+  box-shadow: 0 2px 8px #0002;
+  display: inline-block;
+  min-width: 320px;
+  background: #fff;
+  vertical-align: top;
+}
+
+.bingo-card-header {
+  font-weight: bold;
+  text-align: center;
+  margin-bottom: 10px;
+  font-size: 20px;
+  letter-spacing: 1px;
+}
+
+.bingo-table {
+  border-collapse: separate;
+  border-spacing: 6px;
+  width: 100%;
+}
+
+.bingo-cell {
+  border: 2px solid #bbb;
+  border-radius: 8px;
+  width: 96px;
+  height: 60px;
+  background: #f8f8fa;
+  cursor: pointer;
+  text-align: center;
+  vertical-align: middle;
+  font-size: 15px;
+  font-weight: 500;
+  position: relative;
+  transition: background 0.2s, box-shadow 0.2s;
+}
+
+.bingo-cell:hover {
+  background: #e3fbe9;
+}
+
+.bingo-cell.checked {
+  background: #56e68c;
+  box-shadow: 0 0 0 2px #23c16b;
+}
+
+.bingo-checkmark {
+  position: absolute;
+  right: 8px;
+  bottom: 8px;
+  font-weight: bold;
+  color: #23c16b;
+  font-size: 22px;
+}
