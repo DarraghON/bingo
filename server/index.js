@@ -2,7 +2,7 @@ const express = require('express');
 const http = require('http');
 const cors = require('cors');
 const { Server } = require('socket.io');
-const path = require('path'); // Only declare once at the top
+const path = require('path');
 
 const PORT = process.env.PORT || 4000;
 
@@ -203,6 +203,18 @@ io.on('connection', (socket) => {
     ) return;
 
     bingoCards[targetUser][row][col].checked = true;
+    io.to('bingo').emit('card_updated', { targetUser, card: bingoCards[targetUser] });
+  });
+
+  // NEW: handler for unmark_card
+  socket.on('unmark_card', ({ targetUser, row, col }) => {
+    if (
+      !bingoCards[targetUser] ||
+      row < 0 || row > 2 ||
+      col < 0 || col > 4
+    ) return;
+
+    bingoCards[targetUser][row][col].checked = false;
     io.to('bingo').emit('card_updated', { targetUser, card: bingoCards[targetUser] });
   });
 
