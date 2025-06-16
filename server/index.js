@@ -28,7 +28,7 @@ const TWILIO_PHONE_NUMBER = "+16573773539";
 
 // --- Usernames, passwords, short/real names mapping, phone numbers ---
 const USER_PROFILES = [
-  { username: "admin", short: "Admin", name: "Administrator", password: "adminpass" }, // No phone for admin
+  { username: "admin", short: "Admin", name: "Administrator", password: "adminpass" },
   { username: "user1", short: "Ben", name: "Ben McElligott", password: "martini", phone: "+353871107017" },
   { username: "user2", short: "Darragh", name: "Darragh O’Neill", password: "spritz", phone: "+353873968824" },
   { username: "user3", short: "Mike", name: "Mike Brady", password: "daiquiri", phone: "+353871054394" },
