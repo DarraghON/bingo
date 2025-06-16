@@ -24,11 +24,12 @@ const userPasswords = [
 ];
 
 function App() {
-  // Step 1: Admin login
+  // Admin auth state
   const [adminAuth, setAdminAuth] = useState({ token: null, username: null, short: null });
-  // Step 2: Player identity after admin login
-  const [adminPlayer, setAdminPlayer] = useState(null);
-  const [playerPassword, setPlayerPassword] = useState('');
+  // Player identity state after admin login
+  const [adminPlayer, setAdminPlayer] = useState(null); // { username, short, token } or null
+  const [playerLogin, setPlayerLogin] = useState({ username: '', password: '', short: '' });
+  const [playerLoginError, setPlayerLoginError] = useState('');
   const [users, setUsers] = useState([]);
   const [cards, setCards] = useState([]);
   const [adminSelectedUser, setAdminSelectedUser] = useState('');
@@ -47,19 +48,27 @@ function App() {
     }
   };
 
-  // --- Admin Login Step 2: Player selection ---
-  const handleAdminPlayerLogin = e => {
+  // --- Admin Login Step 2: Player verification ---
+  const handleAdminPlayerLogin = async e => {
     e.preventDefault();
-    if (!adminPlayer || !playerPassword) {
-      alert("Select player and enter password");
+    setPlayerLoginError('');
+    if (!playerLogin.username || !playerLogin.password) {
+      setPlayerLoginError("Select player and enter password.");
       return;
     }
-    const userObj = userPasswords.find(u => u.username === adminPlayer);
-    if (!userObj || userObj.password !== playerPassword) {
-      alert("Incorrect player password");
-      return;
+    try {
+      // Attempt login with the player credentials
+      const res = await axios.post('/api/login', { username: playerLogin.username, password: playerLogin.password });
+      const userObj = userPasswords.find(u => u.username === playerLogin.username);
+      setAdminPlayer({
+        username: playerLogin.username,
+        short: userObj?.short || playerLogin.username,
+        token: res.data.token
+      });
+      setPlayerLoginError('');
+    } catch {
+      setPlayerLoginError("Incorrect player password.");
     }
-    setPlayerPassword('');
   };
 
   // --- Normal player login ---
@@ -74,8 +83,8 @@ function App() {
 
   // --- Data loading ---
   useEffect(() => {
-    // For both admin and player, fetch users/cards
-    const token = adminAuth.token || auth.token;
+    // For both admin and player, fetch users/cards, depending on which context is active
+    const token = adminAuth.token || (adminPlayer && adminPlayer.token) || auth.token;
     if (!token) return;
     (async () => {
       const resUsers = await axios.get('/api/users', {
@@ -88,12 +97,12 @@ function App() {
       });
       setCards(resCards.data);
     })();
-  }, [adminAuth, auth]);
+  }, [adminAuth, adminPlayer, auth]);
 
   // --- Socket setup for real time updates ---
   useEffect(() => {
-    const username = adminAuth.username || auth.username;
-    const token = adminAuth.token || auth.token;
+    const username = adminAuth.username || (adminPlayer && adminPlayer.username) || auth.username;
+    const token = adminAuth.token || (adminPlayer && adminPlayer.token) || auth.token;
     if (!token || !username) return;
     socket.emit('join', { username });
 
@@ -103,7 +112,7 @@ function App() {
       );
     });
     return () => socket.off('card_updated');
-  }, [adminAuth, auth]);
+  }, [adminAuth, adminPlayer, auth]);
 
   // --- Admin: load selected user's card for editing ---
   useEffect(() => {
@@ -121,12 +130,12 @@ function App() {
 
   // --- Bingo marking ---
   const handleMark = (username, row, col) => {
-    const token = adminAuth.token || auth.token;
+    const token = adminAuth.token || (adminPlayer && adminPlayer.token) || auth.token;
     if (!token) return;
     socket.emit('mark_card', { targetUser: username, row, col });
   };
   const handleUnmark = (username, row, col) => {
-    const token = adminAuth.token || auth.token;
+    const token = adminAuth.token || (adminPlayer && adminPlayer.token) || auth.token;
     if (!token) return;
     socket.emit('unmark_card', { targetUser: username, row, col });
   };
@@ -150,16 +159,20 @@ function App() {
     );
   }
 
-  // --- After Admin Login: select player identity ---
+  // --- After Admin Login: enforce player login and verification ---
   if (adminAuth.token && !adminPlayer) {
     return (
       <div style={{ maxWidth: 320, margin: '100px auto', padding: 20, border: '1px solid #ccc' }}>
-        <h2>Admin: Select Player Identity</h2>
+        <h2>Admin: Verify Player Identity</h2>
         <form onSubmit={handleAdminPlayerLogin}>
           <div>
             <select
-              value={adminPlayer || ''}
-              onChange={e => setAdminPlayer(e.target.value)}
+              value={playerLogin.username}
+              onChange={e => {
+                const uname = e.target.value;
+                const userObj = userPasswords.find(u => u.username === uname);
+                setPlayerLogin({ username: uname, password: '', short: userObj?.short || '' });
+              }}
               style={{ width: '100%', marginBottom: 10 }}
             >
               <option value="">-- Select your player --</option>
@@ -170,14 +183,15 @@ function App() {
           </div>
           <div>
             <input
-              value={playerPassword}
+              value={playerLogin.password}
               type="text"
-              onChange={e => setPlayerPassword(e.target.value)}
+              onChange={e => setPlayerLogin(pl => ({ ...pl, password: e.target.value }))}
               placeholder="Your player password"
               style={{ width: '100%', marginBottom: 10 }}
             />
           </div>
           <button type="submit" style={{ width: '100%' }}>Continue</button>
+          {playerLoginError && <div style={{ color: "red", marginTop: 8 }}>{playerLoginError}</div>}
         </form>
       </div>
     );
@@ -189,7 +203,7 @@ function App() {
       <div style={{ padding: 20 }}>
         <h1>Bingo Admin</h1>
         <div style={{ marginBottom: 10 }}>
-          Logged in as Admin ({users.find(u => u.username === adminPlayer)?.short || adminPlayer})
+          Logged in as Admin, verified as <b>{users.find(u => u.username === adminPlayer.username)?.short || adminPlayer.username}</b>
         </div>
         <div style={{ maxWidth: 400, marginBottom: 20 }}>
           <label>
@@ -200,7 +214,7 @@ function App() {
             >
               <option value="">-- choose player --</option>
               {users
-                .filter(u => u.username !== 'admin' && u.username !== adminPlayer)
+                .filter(u => u.username !== 'admin' && u.username !== adminPlayer.username)
                 .map(u =>
                   <option key={u.username} value={u.username}>{u.short}</option>
                 )}
