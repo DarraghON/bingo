@@ -20,6 +20,7 @@ const io = new Server(server, {
 
 // --- Usernames, passwords, and short/real names mapping ---
 const USER_PROFILES = [
+  { username: "admin", short: "Admin", name: "Administrator", password: "adminpass" }, // Add admin
   { username: "user1", short: "Ben", name: "Ben McElligott", password: "martini" },
   { username: "user2", short: "Darragh", name: "Darragh O’Neill", password: "spritz" },
   { username: "user3", short: "Mike", name: "Mike Brady", password: "daiquiri" },
@@ -120,7 +121,10 @@ function buildCard(labels) {
 // --- Map of username => card (3x5 array of {checked,label}) ---
 const bingoCards = {};
 USER_PROFILES.forEach(({ username }) => {
-  bingoCards[username] = buildCard(CARD_LABELS[username]);
+  // Don't create a card for admin
+  if (username !== "admin") {
+    bingoCards[username] = buildCard(CARD_LABELS[username]);
+  }
 });
 
 // --- In-memory sessions ---
@@ -154,8 +158,21 @@ app.get('/api/users', authMiddleware, (req, res) => {
 
 // --- Card data endpoint: full card (including short/real name) for all except yourself ---
 app.get('/api/cards', authMiddleware, (req, res) => {
+  if (req.username === "admin") {
+    // Admin can see all (except their own admin card)
+    const all = USER_PROFILES
+      .filter(u => u.username !== "admin")
+      .map(u => ({
+        username: u.username,
+        short: u.short,
+        name: u.name,
+        card: bingoCards[u.username]
+      }));
+    return res.json(all);
+  }
+  // Otherwise normal
   const others = USER_PROFILES
-    .filter(u => u.username !== req.username)
+    .filter(u => u.username !== req.username && u.username !== "admin")
     .map(u => ({
       username: u.username,
       short: u.short,
@@ -165,11 +182,20 @@ app.get('/api/cards', authMiddleware, (req, res) => {
   res.json(others);
 });
 
-// --- Optional: (admin/host) endpoint to update a user's card labels (3x5 grid) ---
+// --- Endpoint for a single user's card (for admin to fetch) ---
+app.get('/api/cards/:username', authMiddleware, (req, res) => {
+  const { username } = req.params;
+  if (req.username !== "admin") return res.status(403).json({ error: "Forbidden" });
+  if (!bingoCards[username]) return res.status(404).json({ error: "Not found" });
+  res.json({ card: bingoCards[username] });
+});
+
+// --- Admin-only update endpoint ---
 app.post('/api/cards/:username/labels', authMiddleware, (req, res) => {
   const { username } = req.params;
-  const { labelGrid } = req.body; // Expecting a 3x5 array of strings
+  const { labelGrid } = req.body;
 
+  if (req.username !== "admin") return res.status(403).json({ error: "Forbidden" });
   if (!bingoCards[username] || !Array.isArray(labelGrid) || labelGrid.length !== 3) {
     return res.status(400).json({ error: 'Invalid card or label grid' });
   }
@@ -182,7 +208,6 @@ app.post('/api/cards/:username/labels', authMiddleware, (req, res) => {
     row.map(label => ({ checked: false, label }))
   );
 
-  // Notify all clients
   io.to('bingo').emit('card_updated', { targetUser: username, card: bingoCards[username] });
 
   res.json({ success: true });
@@ -206,7 +231,7 @@ io.on('connection', (socket) => {
     io.to('bingo').emit('card_updated', { targetUser, card: bingoCards[targetUser] });
   });
 
-  // NEW: handler for unmark_card
+  // handler for unmark_card
   socket.on('unmark_card', ({ targetUser, row, col }) => {
     if (
       !bingoCards[targetUser] ||
