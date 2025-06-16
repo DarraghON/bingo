@@ -3,6 +3,7 @@ const http = require('http');
 const cors = require('cors');
 const { Server } = require('socket.io');
 const path = require('path');
+const twilio = require('twilio');
 
 const PORT = process.env.PORT || 4000;
 
@@ -18,22 +19,29 @@ const io = new Server(server, {
   }
 });
 
-// --- Usernames, passwords, and short/real names mapping ---
+// --- Twilio Config (using your provided credentials!) ---
+const client = twilio(
+  "ACb39b27f06e2067164c79fcdef1559ed6", // Account SID
+  "56f907f9052455e38210886419a601ef"    // Auth Token
+);
+const TWILIO_PHONE_NUMBER = "+16573773539";
+
+// --- Usernames, passwords, short/real names mapping, phone numbers ---
 const USER_PROFILES = [
-  { username: "admin", short: "Admin", name: "Administrator", password: "adminpass" }, // Add admin
-  { username: "user1", short: "Ben", name: "Ben McElligott", password: "martini" },
-  { username: "user2", short: "Darragh", name: "Darragh O’Neill", password: "spritz" },
-  { username: "user3", short: "Mike", name: "Mike Brady", password: "daiquiri" },
-  { username: "user4", short: "Oscar", name: "Oscar Cross", password: "mojito" },
-  { username: "user5", short: "Patrick", name: "Patrick Cody", password: "negroni" },
-  { username: "user6", short: "Peter", name: "Peter O'Connor", password: "gimlet" },
-  { username: "user7", short: "Tilly", name: "Tilly Ludford", password: "margarita" },
-  { username: "user8", short: "Sally", name: "Sally Foy", password: "manhattan" },
-  { username: "user9", short: "Hannah", name: "Hannah Boylan", password: "julep" },
-  { username: "user10", short: "Jasmine", name: "Jasmine O’Gara", password: "cobbler" },
-  { username: "user11", short: "Erin", name: "Erin Daly", password: "flip" },
-  { username: "user12", short: "Mika", name: "Mika June", password: "colada" },
-  { username: "user13", short: "Nell", name: "Nell O’Hara", password: "mai-tai" }
+  { username: "admin", short: "Admin", name: "Administrator", password: "adminpass" }, // No phone for admin
+  { username: "user1", short: "Ben", name: "Ben McElligott", password: "martini", phone: "+353871107017" },
+  { username: "user2", short: "Darragh", name: "Darragh O’Neill", password: "spritz", phone: "+353873968824" },
+  { username: "user3", short: "Mike", name: "Mike Brady", password: "daiquiri", phone: "+353871054394" },
+  { username: "user4", short: "Oscar", name: "Oscar Cross", password: "mojito", phone: "+353874654664" },
+  { username: "user5", short: "Patrick", name: "Patrick Cody", password: "negroni", phone: "+353873332901" },
+  { username: "user6", short: "Peter", name: "Peter O'Connor", password: "gimlet", phone: "+353858545252" },
+  { username: "user7", short: "Tilly", name: "Tilly Ludford", password: "margarita", phone: "+353872779735" },
+  { username: "user8", short: "Sally", name: "Sally Foy", password: "manhattan", phone: "+353831334446" },
+  { username: "user9", short: "Hannah", name: "Hannah Boylan", password: "julep", phone: "+353830603355" },
+  { username: "user10", short: "Jasmine", name: "Jasmine O’Gara", password: "cobbler", phone: "+353871822331" },
+  { username: "user11", short: "Erin", name: "Erin Daly", password: "flip", phone: "+353899772860" },
+  { username: "user12", short: "Mika", name: "Mika June", password: "colada", phone: "+353867900192" },
+  { username: "user13", short: "Nell", name: "Nell O’Hara", password: "mai-tai", phone: "+353830084565" }
 ];
 
 // --- 15 items per user (3x5 grid) ---
@@ -121,7 +129,6 @@ function buildCard(labels) {
 // --- Map of username => card (3x5 array of {checked,label}) ---
 const bingoCards = {};
 USER_PROFILES.forEach(({ username }) => {
-  // Don't create a card for admin
   if (username !== "admin") {
     bingoCards[username] = buildCard(CARD_LABELS[username]);
   }
@@ -159,7 +166,6 @@ app.get('/api/users', authMiddleware, (req, res) => {
 // --- Card data endpoint: full card (including short/real name) for all except yourself ---
 app.get('/api/cards', authMiddleware, (req, res) => {
   if (req.username === "admin") {
-    // Admin can see all (except their own admin card)
     const all = USER_PROFILES
       .filter(u => u.username !== "admin")
       .map(u => ({
@@ -170,7 +176,6 @@ app.get('/api/cards', authMiddleware, (req, res) => {
       }));
     return res.json(all);
   }
-  // Otherwise normal
   const others = USER_PROFILES
     .filter(u => u.username !== req.username && u.username !== "admin")
     .map(u => ({
@@ -202,14 +207,10 @@ app.post('/api/cards/:username/labels', authMiddleware, (req, res) => {
   if (!labelGrid.every(row => Array.isArray(row) && row.length === 5)) {
     return res.status(400).json({ error: 'Each row must have 5 items' });
   }
-
-  // Reset checked status but update labels
   bingoCards[username] = labelGrid.map(row =>
     row.map(label => ({ checked: false, label }))
   );
-
   io.to('bingo').emit('card_updated', { targetUser: username, card: bingoCards[username] });
-
   res.json({ success: true });
 });
 
@@ -227,11 +228,26 @@ io.on('connection', (socket) => {
       col < 0 || col > 4
     ) return;
 
-    bingoCards[targetUser][row][col].checked = true;
-    io.to('bingo').emit('card_updated', { targetUser, card: bingoCards[targetUser] });
+    const card = bingoCards[targetUser];
+    if (!card[row][col].checked) {
+      card[row][col].checked = true;
+      io.to('bingo').emit('card_updated', { targetUser, card });
+
+      // SMS notification via Twilio
+      const profile = USER_PROFILES.find(u => u.username === targetUser);
+      if (profile && profile.phone) {
+        const checkedCount = card.flat().filter(cell => cell.checked).length;
+        const remaining = 15 - checkedCount;
+        const msg = `You have just completed one of your items, you're so predictable, ${remaining}/15 items remaining`;
+        client.messages.create({
+          body: msg,
+          from: TWILIO_PHONE_NUMBER,
+          to: profile.phone
+        }).catch(console.error);
+      }
+    }
   });
 
-  // handler for unmark_card
   socket.on('unmark_card', ({ targetUser, row, col }) => {
     if (
       !bingoCards[targetUser] ||
