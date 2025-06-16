@@ -2,8 +2,8 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { io } from 'socket.io-client';
 
-// No API_URL: always use relative URLs
-const socket = io(); // Defaults to same-origin
+// Use relative URL for socket.io so it works in production and locally
+const socket = io(); // defaults to same-origin
 
 const userPasswords = [
   { short: "Ben", username: "user1", password: "martini" },
@@ -11,7 +11,7 @@ const userPasswords = [
   { short: "Mike", username: "user3", password: "daiquiri" },
   { short: "Oscar", username: "user4", password: "mojito" },
   { short: "Patrick", username: "user5", password: "negroni" },
-  { short: "Peter", username: "user6", password: "gimlet" },
+  { short: "Peter", username: "user6", passwsord: "gimlet" },
   { short: "Tilly", username: "user7", password: "margarita" },
   { short: "Sally", username: "user8", password: "manhattan" },
   { short: "Hannah", username: "user9", password: "julep" },
@@ -21,7 +21,7 @@ const userPasswords = [
   { short: "Nell", username: "user13", password: "mai-tai" },
 ];
 
-function BingoCard({ short, card, onMark }) {
+function BingoCard({ short, card, onMark, onUnmark }) {
   return (
     <div style={{ margin: 10, border: '1px solid #ccc', display: 'inline-block', minWidth: 320 }}>
       <div style={{ fontWeight: 'bold', textAlign: 'center', marginBottom: 5 }}>{short}</div>
@@ -37,14 +37,22 @@ function BingoCard({ short, card, onMark }) {
                     width: 100,
                     height: 55,
                     background: cell.checked ? '#7fffd4' : '#fff',
-                    cursor: cell.checked ? 'not-allowed' : 'pointer',
+                    cursor: 'pointer',
                     textAlign: 'center',
                     verticalAlign: 'middle',
                     fontSize: 14,
                     padding: 2,
                     position: 'relative'
                   }}
-                  onClick={() => !cell.checked && onMark(i, j)}
+                  onClick={() => {
+                    if (!cell.checked) {
+                      onMark(i, j);
+                    } else {
+                      if (window.confirm('Are you sure you want to deselect this square?')) {
+                        onUnmark(i, j);
+                      }
+                    }
+                  }}
                   title={cell.label}
                 >
                   <span style={{ opacity: cell.checked ? 0.6 : 1 }}>
@@ -119,6 +127,11 @@ function App() {
     socket.emit('mark_card', { targetUser: username, row, col });
   };
 
+  const handleUnmark = (username, row, col) => {
+    if (!auth.token) return;
+    socket.emit('unmark_card', { targetUser: username, row, col });
+  };
+
   if (!auth.token) {
     return (
       <div style={{ maxWidth: 300, margin: '100px auto', padding: 20, border: '1px solid #ccc' }}>
@@ -141,6 +154,7 @@ function App() {
             short={short}
             card={card}
             onMark={(row, col) => handleMark(username, row, col)}
+            onUnmark={(row, col) => handleUnmark(username, row, col)}
           />
         ))}
       </div>
@@ -177,7 +191,7 @@ function LoginForm({ onLogin }) {
       <div>
         <input
           value={password}
-          type="text" // Password is now visible as plain text
+          type="text"
           onChange={e => setPassword(e.target.value)}
           placeholder="Password"
           style={{ width: '100%', marginBottom: 10 }}
