@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { io } from 'socket.io-client';
+import BingoCard from './BingoCard'; // <-- Import BingoCard
+import './index.css'; // <-- Import CSS
 
-// Use relative URL for socket.io so it works in production and locally
-const socket = io(); // defaults to same-origin
+const socket = io();
 
 const userPasswords = [
   { short: "Ben", username: "user1", password: "martini" },
@@ -11,7 +12,7 @@ const userPasswords = [
   { short: "Mike", username: "user3", password: "daiquiri" },
   { short: "Oscar", username: "user4", password: "mojito" },
   { short: "Patrick", username: "user5", password: "negroni" },
-  { short: "Peter", username: "user6", passwsord: "gimlet" },
+  { short: "Peter", username: "user6", password: "gimlet" },
   { short: "Tilly", username: "user7", password: "margarita" },
   { short: "Sally", username: "user8", password: "manhattan" },
   { short: "Hannah", username: "user9", password: "julep" },
@@ -20,63 +21,6 @@ const userPasswords = [
   { short: "Mika", username: "user12", password: "colada" },
   { short: "Nell", username: "user13", password: "mai-tai" },
 ];
-
-function BingoCard({ short, card, onMark, onUnmark }) {
-  return (
-    <div style={{ margin: 10, border: '1px solid #ccc', display: 'inline-block', minWidth: 320 }}>
-      <div style={{ fontWeight: 'bold', textAlign: 'center', marginBottom: 5 }}>{short}</div>
-      <table style={{ borderCollapse: 'collapse', width: '100%' }}>
-        <tbody>
-          {card.map((row, i) => (
-            <tr key={i}>
-              {row.map((cell, j) => (
-                <td
-                  key={j}
-                  style={{
-                    border: '1px solid #888',
-                    width: 100,
-                    height: 55,
-                    background: cell.checked ? '#7fffd4' : '#fff',
-                    cursor: 'pointer',
-                    textAlign: 'center',
-                    verticalAlign: 'middle',
-                    fontSize: 14,
-                    padding: 2,
-                    position: 'relative'
-                  }}
-                  onClick={() => {
-                    if (!cell.checked) {
-                      onMark(i, j);
-                    } else {
-                      if (window.confirm('Are you sure you want to deselect this square?')) {
-                        onUnmark(i, j);
-                      }
-                    }
-                  }}
-                  title={cell.label}
-                >
-                  <span style={{ opacity: cell.checked ? 0.6 : 1 }}>
-                    {cell.label}
-                  </span>
-                  <div style={{
-                    position: 'absolute',
-                    right: 2,
-                    bottom: 2,
-                    fontWeight: 'bold',
-                    color: cell.checked ? '#0c6' : '#ccc',
-                    fontSize: 20
-                  }}>
-                    {cell.checked ? '✔' : ''}
-                  </div>
-                </td>
-              ))}
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  );
-}
 
 function App() {
   const [auth, setAuth] = useState({ token: null, username: null, short: null });
@@ -147,7 +91,7 @@ function App() {
       <div style={{ marginBottom: 10 }}>
         Logged in as <b>{auth.short}</b>
       </div>
-      <div>
+      <div className="bingo-dashboard-container">
         {cards.map(({ username, short, card }) => (
           <BingoCard
             key={username}
