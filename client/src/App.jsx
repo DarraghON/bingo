@@ -24,98 +24,186 @@ const userPasswords = [
 ];
 
 function App() {
-  const [auth, setAuth] = useState({ token: null, username: null, short: null });
+  // Step 1: Admin login
+  const [adminAuth, setAdminAuth] = useState({ token: null, username: null, short: null });
+  // Step 2: Player identity after admin login
+  const [adminPlayer, setAdminPlayer] = useState(null);
+  const [playerPassword, setPlayerPassword] = useState('');
   const [users, setUsers] = useState([]);
   const [cards, setCards] = useState([]);
   const [adminSelectedUser, setAdminSelectedUser] = useState('');
   const [adminCard, setAdminCard] = useState(null);
 
+  // For normal (non-admin) login
+  const [auth, setAuth] = useState({ token: null, username: null, short: null });
+
+  // --- Admin Login Step 1 ---
+  const handleAdminLogin = async (username, password, short) => {
+    try {
+      const res = await axios.post('/api/login', { username, password });
+      setAdminAuth({ token: res.data.token, username: res.data.username, short });
+    } catch {
+      alert("Admin login failed");
+    }
+  };
+
+  // --- Admin Login Step 2: Player selection ---
+  const handleAdminPlayerLogin = e => {
+    e.preventDefault();
+    if (!adminPlayer || !playerPassword) {
+      alert("Select player and enter password");
+      return;
+    }
+    const userObj = userPasswords.find(u => u.username === adminPlayer);
+    if (!userObj || userObj.password !== playerPassword) {
+      alert("Incorrect player password");
+      return;
+    }
+    setPlayerPassword('');
+  };
+
+  // --- Normal player login ---
+  const handlePlayerLogin = async (username, password, short) => {
+    try {
+      const res = await axios.post('/api/login', { username, password });
+      setAuth({ token: res.data.token, username: res.data.username, short });
+    } catch {
+      alert("Login failed");
+    }
+  };
+
+  // --- Data loading ---
   useEffect(() => {
-    if (!auth.token) return;
-    socket.emit('join', { username: auth.username });
+    // For both admin and player, fetch users/cards
+    const token = adminAuth.token || auth.token;
+    if (!token) return;
+    (async () => {
+      const resUsers = await axios.get('/api/users', {
+        headers: { Authorization: token }
+      });
+      setUsers(resUsers.data);
+
+      const resCards = await axios.get('/api/cards', {
+        headers: { Authorization: token }
+      });
+      setCards(resCards.data);
+    })();
+  }, [adminAuth, auth]);
+
+  // --- Socket setup for real time updates ---
+  useEffect(() => {
+    const username = adminAuth.username || auth.username;
+    const token = adminAuth.token || auth.token;
+    if (!token || !username) return;
+    socket.emit('join', { username });
 
     socket.on('card_updated', ({ targetUser, card }) => {
       setCards(prev =>
         prev.map(c => (c.username === targetUser ? { ...c, card } : c))
       );
     });
+    return () => socket.off('card_updated');
+  }, [adminAuth, auth]);
 
-    return () => {
-      socket.off('card_updated');
-    };
-  }, [auth]);
-
-  const login = async (username, password, short) => {
-    try {
-      const res = await axios.post('/api/login', { username, password });
-      setAuth({ token: res.data.token, username: res.data.username, short });
-    } catch (e) {
-      alert('Login failed');
-    }
-  };
-
+  // --- Admin: load selected user's card for editing ---
   useEffect(() => {
-    if (!auth.token) return;
-    (async () => {
-      const resUsers = await axios.get('/api/users', {
-        headers: { Authorization: auth.token }
-      });
-      setUsers(resUsers.data);
-
-      const resCards = await axios.get('/api/cards', {
-        headers: { Authorization: auth.token }
-      });
-      setCards(resCards.data);
-    })();
-  }, [auth]);
-
-  // --- Admin card editing logic ---
-  useEffect(() => {
-    if (auth.username !== "admin" || !adminSelectedUser) {
+    if (!adminAuth.token || !adminPlayer || !adminSelectedUser) {
       setAdminCard(null);
       return;
     }
     (async () => {
       const res = await axios.get(`/api/cards/${adminSelectedUser}`, {
-        headers: { Authorization: auth.token }
+        headers: { Authorization: adminAuth.token }
       });
-      // Flatten to array of arrays of strings for the form
       setAdminCard(res.data.card.map(row => row.map(cell => cell.label)));
     })();
-  }, [auth, adminSelectedUser]);
+  }, [adminAuth, adminPlayer, adminSelectedUser]);
 
+  // --- Bingo marking ---
   const handleMark = (username, row, col) => {
-    if (!auth.token) return;
+    const token = adminAuth.token || auth.token;
+    if (!token) return;
     socket.emit('mark_card', { targetUser: username, row, col });
   };
-
   const handleUnmark = (username, row, col) => {
-    if (!auth.token) return;
+    const token = adminAuth.token || auth.token;
+    if (!token) return;
     socket.emit('unmark_card', { targetUser: username, row, col });
   };
 
-  // --- Admin card update submit ---
+  // --- Admin: update card ---
   const handleAdminSubmit = async e => {
     e.preventDefault();
     await axios.post(`/api/cards/${adminSelectedUser}/labels`, {
       labelGrid: adminCard
-    }, { headers: { Authorization: auth.token } });
+    }, { headers: { Authorization: adminAuth.token } });
     alert("Card updated!");
   };
 
-  // --- Render admin card editor ---
-  if (auth.username === "admin") {
+  // --- Admin Login UI ---
+  if (!adminAuth.token && !auth.token) {
+    return (
+      <div style={{ maxWidth: 300, margin: '100px auto', padding: 20, border: '1px solid #ccc' }}>
+        <h2>Login</h2>
+        <LoginForm onLogin={handlePlayerLogin} adminAllowed onAdminLogin={handleAdminLogin} />
+      </div>
+    );
+  }
+
+  // --- After Admin Login: select player identity ---
+  if (adminAuth.token && !adminPlayer) {
+    return (
+      <div style={{ maxWidth: 320, margin: '100px auto', padding: 20, border: '1px solid #ccc' }}>
+        <h2>Admin: Select Player Identity</h2>
+        <form onSubmit={handleAdminPlayerLogin}>
+          <div>
+            <select
+              value={adminPlayer || ''}
+              onChange={e => setAdminPlayer(e.target.value)}
+              style={{ width: '100%', marginBottom: 10 }}
+            >
+              <option value="">-- Select your player --</option>
+              {userPasswords.filter(u => u.username !== 'admin').map(u =>
+                <option value={u.username} key={u.username}>{u.short}</option>
+              )}
+            </select>
+          </div>
+          <div>
+            <input
+              value={playerPassword}
+              type="text"
+              onChange={e => setPlayerPassword(e.target.value)}
+              placeholder="Your player password"
+              style={{ width: '100%', marginBottom: 10 }}
+            />
+          </div>
+          <button type="submit" style={{ width: '100%' }}>Continue</button>
+        </form>
+      </div>
+    );
+  }
+
+  // --- Admin dashboard ---
+  if (adminAuth.token && adminPlayer) {
     return (
       <div style={{ padding: 20 }}>
         <h1>Bingo Admin</h1>
+        <div style={{ marginBottom: 10 }}>
+          Logged in as Admin ({users.find(u => u.username === adminPlayer)?.short || adminPlayer})
+        </div>
         <div style={{ maxWidth: 400, marginBottom: 20 }}>
           <label>
-            Select Player:&nbsp;
-            <select value={adminSelectedUser} onChange={e => setAdminSelectedUser(e.target.value)}>
+            Select Player to Edit:&nbsp;
+            <select
+              value={adminSelectedUser}
+              onChange={e => setAdminSelectedUser(e.target.value)}
+            >
               <option value="">-- choose player --</option>
-              {users.filter(u => u.username !== "admin").map(u =>
-                <option key={u.username} value={u.username}>{u.short}</option>
-              )}
+              {users
+                .filter(u => u.username !== 'admin' && u.username !== adminPlayer)
+                .map(u =>
+                  <option key={u.username} value={u.username}>{u.short}</option>
+                )}
             </select>
           </label>
         </div>
@@ -147,43 +235,44 @@ function App() {
     );
   }
 
-  if (!auth.token) {
+  // --- Player dashboard (normal login) ---
+  if (auth.token && auth.username) {
     return (
-      <div style={{ maxWidth: 300, margin: '100px auto', padding: 20, border: '1px solid #ccc' }}>
-        <h2>Login</h2>
-        <LoginForm onLogin={login} />
+      <div style={{ padding: 20 }}>
+        <h1>Bingo Dashboard</h1>
+        <div style={{ marginBottom: 10 }}>
+          Logged in as <b>{auth.short}</b>
+        </div>
+        <div className="bingo-dashboard-container">
+          {cards.map(({ username, short, card }) => (
+            <BingoCard
+              key={username}
+              short={short}
+              card={card}
+              onMark={(row, col) => handleMark(username, row, col)}
+              onUnmark={(row, col) => handleUnmark(username, row, col)}
+            />
+          ))}
+        </div>
       </div>
     );
   }
 
-  return (
-    <div style={{ padding: 20 }}>
-      <h1>Bingo Dashboard</h1>
-      <div style={{ marginBottom: 10 }}>
-        Logged in as <b>{auth.short}</b>
-      </div>
-      <div className="bingo-dashboard-container">
-        {cards.map(({ username, short, card }) => (
-          <BingoCard
-            key={username}
-            short={short}
-            card={card}
-            onMark={(row, col) => handleMark(username, row, col)}
-            onUnmark={(row, col) => handleUnmark(username, row, col)}
-          />
-        ))}
-      </div>
-    </div>
-  );
+  return null;
 }
 
-function LoginForm({ onLogin }) {
+// --- Modified Login Form (allows admin and normal login) ---
+function LoginForm({ onLogin, adminAllowed, onAdminLogin }) {
   const [selected, setSelected] = useState(userPasswords[0]);
   const [password, setPassword] = useState('');
 
   const submit = e => {
     e.preventDefault();
-    onLogin(selected.username, password, selected.short);
+    if (adminAllowed && selected.username === 'admin') {
+      onAdminLogin(selected.username, password, selected.short);
+    } else {
+      onLogin(selected.username, password, selected.short);
+    }
   };
 
   return (
